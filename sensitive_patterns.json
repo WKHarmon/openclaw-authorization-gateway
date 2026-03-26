@@ -1,0 +1,16 @@
+{
+  "redact_subjects": [
+    "password reset",
+    "verification code",
+    "2FA",
+    "security alert",
+    "login attempt",
+    "one-time code",
+    "confirm your identity"
+  ],
+  "redact_senders": [
+    "noreply@accounts.google.com",
+    "security-noreply@accounts.google.com",
+    "no-reply@accounts.google.com"
+  ]
+}

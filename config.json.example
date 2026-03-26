@@ -1,0 +1,25 @@
+{
+  "port": 18795,
+  "gmail_account": "user@example.com",
+  "vault_path": "secret/gmail-proxy",
+  "vault_api_key_path": "secret/your-project/gmail-proxy",
+  "agent_name": "YourAgent",
+  "approver_name": "Approver",
+  "signal": {
+    "api_url": "http://signal-api:8080",
+    "sender": "+1XXXXXXXXXX",
+    "approver": "+1YYYYYYYYYY",
+    "webhook_token": ""
+  },
+  "approval_url_base": "https://approval.your-domain.com",
+  "allowed_callback_domains": [],
+  "rate_limit": {
+    "grant_requests_per_minute": 5
+  },
+  "defaults": {
+    "level1_expiry_minutes": 5,
+    "level2_default_duration_minutes": 30,
+    "level3_default_duration_minutes": 15
+  },
+  "sensitive_patterns_file": "sensitive_patterns.json"
+}
