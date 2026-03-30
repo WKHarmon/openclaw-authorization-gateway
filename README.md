@@ -1,4 +1,4 @@
-# OpenClaw Authorization Gateway
+# Agent Authorization Gateway
 
 General-purpose authorization gateway that brokers access to multiple resource types on behalf of AI agents. Access is tiered, time-limited, and requires out-of-band human approval via Signal.
 
@@ -436,14 +436,14 @@ Response:
   "hosts": {
     "web-prod-1": {
       "principals": ["deploy"],
-      "role": "openclaw-ssh-deploy",
+      "role": "agent-ssh-deploy",
       "description": "Production web server"
     }
   },
   "hostGroups": {
     "production": {
       "tag": "production",
-      "role": "openclaw-ssh-deploy",
+      "role": "agent-ssh-deploy",
       "description": "All production servers",
       "min_level": 2
     }
@@ -604,7 +604,7 @@ See `config.json.example` for the full schema including rate limits, default gra
 export VAULT_ADDR=https://vault.your-domain.com:8200
 export VAULT_ROLE_ID=...
 export VAULT_SECRET_ID=...
-bao kv put secret/openclaw/authorization-gateway \
+bao kv put secret/agent/authorization-gateway \
   client_id="YOUR_CLIENT_ID" \
   client_secret="YOUR_CLIENT_SECRET"
 ```
@@ -672,9 +672,9 @@ bao write ssh/config/ca generate_signing_key=true
 bao read -field=public_key ssh/config/ca > trusted-user-ca-keys.pem
 
 # Create a signing role
-bao write ssh/roles/openclaw-ssh-deploy \
+bao write ssh/roles/agent-ssh-deploy \
   key_type=ca \
-  allowed_users="deploy,openclaw-agent" \
+  allowed_users="deploy,agent" \
   default_user="deploy" \
   ttl=5m \
   max_ttl=24h \
@@ -686,7 +686,7 @@ Create a Vault policy for the gateway:
 
 ```hcl
 # Allow signing SSH keys
-path "ssh/sign/openclaw-ssh-deploy" {
+path "ssh/sign/agent-ssh-deploy" {
   capabilities = ["create", "update"]
 }
 
@@ -722,22 +722,22 @@ Add the SSH provider configuration to `config.json`:
       "enabled": true,
       "vault_ssh_mount": "ssh",
       "roles": {
-        "openclaw-ssh-deploy": {
-          "allowed_principals": ["deploy", "openclaw-agent"],
+        "agent-ssh-deploy": {
+          "allowed_principals": ["deploy", "agent"],
           "default_extensions": {"permit-pty": ""}
         }
       },
       "hosts": {
         "web-prod-1": {
           "principals": ["deploy"],
-          "role": "openclaw-ssh-deploy",
+          "role": "agent-ssh-deploy",
           "description": "Production web server"
         }
       },
       "host_groups": {
         "production": {
           "tag": "production",
-          "role": "openclaw-ssh-deploy",
+          "role": "agent-ssh-deploy",
           "description": "All production servers",
           "min_level": 2
         }
@@ -763,7 +763,7 @@ cp .env.example .env
 
 ```bash
 ssh user@your-server.example.com
-cd ~/openclaw-authorization-gateway
+cd ~/agent-authorization-gateway
 docker compose up -d --build
 ```
 

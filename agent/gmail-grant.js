@@ -1,6 +1,6 @@
 // gmail-grant.js
-// Receives grant approval/denial callbacks from the OpenClaw Gmail Proxy.
-// The proxy POSTs here when the approver approves or denies a grant request.
+// Receives grant approval/denial callbacks from the Authorization Gateway.
+// The gateway POSTs here when the approver approves or denies a grant request.
 //
 // Uses action:'wake' to inject a system event into the main session.
 // The hook mapping MUST set deliver:false to prevent a redundant agent run.

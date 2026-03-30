@@ -1,5 +1,5 @@
 // grant-callback.js
-// Receives grant approval/denial callbacks from the OpenClaw Authorization Gateway.
+// Receives grant approval/denial callbacks from the Agent Authorization Gateway.
 // The gateway POSTs here when the approver approves or denies a grant request.
 //
 // Uses action:'wake' to inject a system event into the main session.

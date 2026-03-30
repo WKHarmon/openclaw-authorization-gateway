@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""OpenClaw Authorization Gateway — entry point."""
+"""Agent Authorization Gateway — entry point."""
 
 import logging
 

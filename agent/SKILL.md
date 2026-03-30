@@ -11,7 +11,7 @@ Tiered, time-limited access to Gmail (user@example.com) and SSH hosts via a gate
 # Set VAULT_ADDR, VAULT_ROLE_ID, VAULT_SECRET_ID in your environment
 
 curl -s "https://approval.your-domain.com/api/..." \
-  -H "Authorization: Bearer $OPENCLAW_GMAIL_PROXY_API_KEY" \
+  -H "Authorization: Bearer $AGENT_AUTHORIZATION_GATEWAY_API_KEY" \
   # -H "CF-Access-Client-Id: $CLOUDFLARE_ACCESS_CF_ACCESS_CLIENT_ID" \
   # -H "CF-Access-Client-Secret: $CLOUDFLARE_ACCESS_CF_ACCESS_CLIENT_SECRET"
 ```
@@ -161,14 +161,14 @@ Response:
   "hosts": {
     "web-prod-1": {
       "principals": ["deploy"],
-      "role": "openclaw-ssh-deploy",
+      "role": "agent-ssh-deploy",
       "description": "Production web server"
     }
   },
   "hostGroups": {
     "production": {
       "tag": "production",
-      "role": "openclaw-ssh-deploy",
+      "role": "agent-ssh-deploy",
       "description": "All production servers",
       "min_level": 2
     }
@@ -293,7 +293,7 @@ Response (both providers):
 }
 ```
 
-Wait for the callback to wake your session. When the approver approves or denies, the gateway POSTs to your configured callback URL and OpenClaw resumes your session automatically.
+Wait for the callback to wake your session. When the approver approves or denies, the gateway POSTs to your configured callback URL and the agent resumes your session automatically.
 
 ## `GET /api/grants/:id`
 Poll grant status if callbacks are suppressed. Values: `pending`, `active`, `consumed` (L1 after body read or cert issue), `expired`, `denied`, `revoked`.

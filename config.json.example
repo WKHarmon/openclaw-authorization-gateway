@@ -2,7 +2,7 @@
   "port": 18795,
   "gmail_account": "user@example.com",
   "vault_path": "secret/authorization-gateway",
-  "vault_api_key_path": "secret/openclaw/authorization-gateway",
+  "vault_api_key_path": "secret/agent/authorization-gateway",
   "agent_name": "YourAgent",
   "approver_name": "Approver",
   "signal": {
@@ -13,9 +13,9 @@
   },
   "approval_url_base": "https://approval.your-domain.com",
   "callback": {
-    "url": "https://your-openclaw-domain.com/hooks/grant-callback",
+    "url": "https://your-agent-domain.com/hooks/grant-callback",
     "cf_auth": true,
-    "hooks_token_vault_path": "secret/openclaw/gateway"
+    "hooks_token_vault_path": "secret/agent/gateway"
   },
   "rate_limit": {
     "grant_requests_per_minute": 5
@@ -30,33 +30,33 @@
     "ssh": {
       "enabled": false,
       "vault_ssh_mount": "ssh-client-signer",
-      "vault_ssh_role": "openclaw",
+      "vault_ssh_role": "agent",
       "default_ttl_minutes": 30,
       "max_ttl_minutes": 30,
       "hosts": {
         "server": {
           "hostnames": ["server", "server.local", "server.wkharmon.com", "server.tailc05c6.ts.net"],
-          "principals": ["pi", "user", "kyle", "admin", "root", "openclaw"],
+          "principals": ["pi", "user", "kyle", "admin", "root", "agent"],
           "description": "Primary server"
         },
         "aiserver": {
           "hostnames": ["aiserver", "aiserver.local", "aiserver.wkharmon.com", "aiserver.tailc05c6.ts.net"],
-          "principals": ["pi", "user", "kyle", "admin", "root", "openclaw"],
+          "principals": ["pi", "user", "kyle", "admin", "root", "agent"],
           "description": "AI server"
         },
         "wkh-gaming": {
           "hostnames": ["wkh-gaming", "wkh-gaming.local", "wkh-gaming.wkharmon.com", "wkh-gaming.tailc05c6.ts.net"],
-          "principals": ["pi", "user", "kyle", "admin", "root", "openclaw"],
+          "principals": ["pi", "user", "kyle", "admin", "root", "agent"],
           "description": "Gaming PC"
         },
-        "openclaw": {
-          "hostnames": ["openclaw", "openclaw.local", "openclaw.wkharmon.com", "openclaw.tailc05c6.ts.net"],
-          "principals": ["pi", "user", "kyle", "admin", "root", "openclaw"],
-          "description": "OpenClaw server"
+        "agent": {
+          "hostnames": ["agent", "agent.local", "agent.wkharmon.com", "agent.tailc05c6.ts.net"],
+          "principals": ["pi", "user", "kyle", "admin", "root", "agent"],
+          "description": "Agent server"
         },
         "vault": {
           "hostnames": ["vault", "vault.local", "vault.wkharmon.com", "vault.tailc05c6.ts.net", "secrets", "secrets.local", "secrets.wkharmon.com", "secrets.tailc05c6.ts.net"],
-          "principals": ["pi", "user", "kyle", "admin", "root", "openclaw"],
+          "principals": ["pi", "user", "kyle", "admin", "root", "agent"],
           "description": "Vault / secrets server"
         }
       },

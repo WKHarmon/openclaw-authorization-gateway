@@ -141,7 +141,7 @@ class SSHProvider:
             log.info(
                 "SSH provider started (mount=%s, role=%s, %d hosts, %d groups)",
                 cfg.get("vault_ssh_mount", "ssh-client-signer"),
-                cfg.get("vault_ssh_role", "openclaw"),
+                cfg.get("vault_ssh_role", "agent"),
                 len(cfg.get("hosts", {})),
                 len(cfg.get("host_groups", {})),
             )
@@ -187,7 +187,7 @@ def _register_ssh_routes(app: FastAPI):
         params = json.loads(grant.get("resource_params") or "{}")
         cfg = _ssh_config()
         mount = cfg.get("vault_ssh_mount", "ssh-client-signer")
-        role = cfg.get("vault_ssh_role", "openclaw")
+        role = cfg.get("vault_ssh_role", "agent")
         principal = params.get("principal", "")
 
         if not principal:

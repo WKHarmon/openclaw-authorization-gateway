@@ -164,7 +164,7 @@ async def lifespan(app: FastAPI):
 # ── App factory ───────────────────────────────────────────────────────────
 
 def create_app() -> FastAPI:
-    application = FastAPI(title="OpenClaw Authorization Gateway", lifespan=lifespan)
+    application = FastAPI(title="Agent Authorization Gateway", lifespan=lifespan)
     application.middleware("http")(check_api_key)
 
     # Register shared routes
