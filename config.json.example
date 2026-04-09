@@ -54,6 +54,11 @@
           "principals": ["pi", "user", "kyle", "admin", "root", "agent"],
           "description": "Agent server"
         },
+        "spark": {
+          "hostnames": ["spark", "spark.wkharmon.com", "spark-wifi.wkharmon.com"],
+          "principals": ["pi", "user", "kyle", "admin", "root", "agent"],
+          "description": "Spark"
+        },
         "vault": {
           "hostnames": ["vault", "vault.local", "vault.wkharmon.com", "vault.tailc05c6.ts.net", "secrets", "secrets.local", "secrets.wkharmon.com", "secrets.tailc05c6.ts.net"],
           "principals": ["pi", "user", "kyle", "admin", "root", "agent"],
