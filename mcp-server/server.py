@@ -146,8 +146,10 @@ async def ssh_get_credentials(grant_id: str, public_key: str = "") -> str:
 
     ephemeral_key_path = None
     if not public_key:
-        # Generate ephemeral ed25519 keypair
-        tmp_dir = tempfile.mkdtemp(prefix="ssh-mcp-")
+        # Generate ephemeral ed25519 keypair in a user-scoped directory
+        base = Path.home() / ".cache" / "ssh-mcp"
+        base.mkdir(parents=True, exist_ok=True, mode=0o700)
+        tmp_dir = tempfile.mkdtemp(dir=base)
         key_path = Path(tmp_dir) / "id_ed25519"
         subprocess.run(
             ["ssh-keygen", "-t", "ed25519", "-f", str(key_path), "-N", "", "-q"],
