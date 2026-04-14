@@ -84,7 +84,6 @@ async def create_or_reuse_grant(
             host=req.host,
             host_group=req.hostGroup,
             principal=req.principal,
-            role=req.role,
             requestor=requestor_name,
             requested_duration_minutes=duration,
         )
@@ -169,7 +168,7 @@ async def create_or_reuse_grant(
     # Build resource_params JSON (provider-specific structured data)
     resource_params = {}
     if req.resourceType == "ssh":
-        for key in ("host", "principal", "hostGroup", "role", "publicKey"):
+        for key in ("host", "principal", "hostGroup", "publicKey"):
             val = getattr(req, key, None)
             if val is not None:
                 resource_params[key] = val

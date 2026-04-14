@@ -26,7 +26,7 @@ def test_reuse_active_grant_when_duration_satisfied(gateway_env):
         host="server",
         principal="kyle",
         remaining_minutes=25,
-        requestor="Lisa",
+        requestor="TestAgent",
     )
     resp = gateway_env["client"].post(
         "/api/grants/request",
@@ -68,7 +68,7 @@ def test_reuse_active_grant_when_shorter_than_requested(gateway_env):
         host="server",
         principal="kyle",
         remaining_minutes=2,
-        requestor="Lisa",
+        requestor="TestAgent",
     )
     resp = gateway_env["client"].post(
         "/api/grants/request",
@@ -113,7 +113,7 @@ def test_explicit_replacement_forces_new_grant(gateway_env):
         host="server",
         principal="kyle",
         remaining_minutes=1,
-        requestor="Lisa",
+        requestor="TestAgent",
     )
     resp = gateway_env["client"].post(
         "/api/grants/request",
@@ -185,7 +185,7 @@ def test_different_host_does_not_reuse(gateway_env):
         host="aiserver",
         principal="kyle",
         remaining_minutes=25,
-        requestor="Lisa",
+        requestor="TestAgent",
     )
     resp = gateway_env["client"].post(
         "/api/grants/request",
@@ -213,7 +213,7 @@ def test_different_principal_does_not_reuse(gateway_env):
         host="server",
         principal="root",
         remaining_minutes=25,
-        requestor="Lisa",
+        requestor="TestAgent",
     )
     resp = gateway_env["client"].post(
         "/api/grants/request",
@@ -241,7 +241,7 @@ def test_different_level_does_not_reuse(gateway_env):
         level=3,
         principal="kyle",
         remaining_minutes=25,
-        requestor="Lisa",
+        requestor="TestAgent",
     )
     resp = gateway_env["client"].post(
         "/api/grants/request",
@@ -299,7 +299,7 @@ def test_reuse_active_level2_group_grant(gateway_env):
         host_group="production",
         principal="deploy",
         remaining_minutes=25,
-        requestor="Lisa",
+        requestor="TestAgent",
     )
     resp = gateway_env["client"].post(
         "/api/grants/request",
@@ -330,13 +330,13 @@ def test_find_active_ssh_grant_helper(gateway_env):
         host="server",
         principal="kyle",
         remaining_minutes=10,
-        requestor="Lisa",
+        requestor="TestAgent",
     )
     match = find_active_ssh_grant(
         level=1,
         host="server",
         principal="kyle",
-        requestor="Lisa",
+        requestor="TestAgent",
         requested_duration_minutes=5,
     )
     assert match is not None
@@ -349,7 +349,7 @@ def test_find_active_ssh_grant_helper(gateway_env):
         level=1,
         host="server",
         principal="kyle",
-        requestor="Lisa",
+        requestor="TestAgent",
         requested_duration_minutes=60,
     )
     assert match2 is not None
@@ -361,7 +361,7 @@ def test_find_active_ssh_grant_helper(gateway_env):
         level=1,
         host="aiserver",
         principal="kyle",
-        requestor="Lisa",
+        requestor="TestAgent",
     ) is None
 
 
@@ -377,7 +377,7 @@ def test_old_payload_shape_still_works(gateway_env):
         host="server",
         principal="kyle",
         remaining_minutes=20,
-        requestor="Lisa",
+        requestor="TestAgent",
     )
     resp = gateway_env["client"].post(
         "/api/grants/request",

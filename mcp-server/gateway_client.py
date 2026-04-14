@@ -115,7 +115,6 @@ class GatewayClient:
         description: str,
         host: str | None = None,
         host_group: str | None = None,
-        role: str | None = None,
         duration_minutes: int | None = None,
         allow_replace_shorter_grant: bool = False,
     ) -> dict:
@@ -139,8 +138,6 @@ class GatewayClient:
             payload["host"] = host
         if host_group:
             payload["hostGroup"] = host_group
-        if role:
-            payload["role"] = role
         if duration_minutes:
             payload["durationMinutes"] = duration_minutes
         if allow_replace_shorter_grant:

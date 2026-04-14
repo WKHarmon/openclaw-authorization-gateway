@@ -67,12 +67,11 @@ Additional fields for SSH grants:
 | `host` | string | Level 1 only | Target hostname (must be in config) |
 | `principal` | string | Level 1 (optional), Level 3 (required) | Unix username for the certificate |
 | `hostGroup` | string | Level 2 only | Host group name (must be in config) |
-| `role` | string | no | Vault SSH role override (defaults to host/group config) |
 | `allowReplaceShorterGrant` | bool | no | Default false. By default SSH requests dedupe against an active matching grant (see below). Set to true to bypass dedupe when the existing grant's remaining duration is shorter than what you now need, and force a fresh approval request. |
 
 ### SSH grant dedupe
 
-When `resourceType == "ssh"`, the gateway checks for an existing active matching grant before creating a new one. Match criteria: same requestor, same `level`, same `principal`, same `host` (L1) / `hostGroup` (L2), and — when the caller explicitly specified a `role` — same `role`. If a match exists and `allowReplaceShorterGrant` is false (default), the gateway returns the existing active grant instead of creating a new pending one. This suppresses spurious approval prompts when an earlier grant is still valid.
+When `resourceType == "ssh"`, the gateway checks for an existing active matching grant before creating a new one. Match criteria: same requestor, same `level`, same `principal`, same `host` (L1) / `hostGroup` (L2). If a match exists and `allowReplaceShorterGrant` is false (default), the gateway returns the existing active grant instead of creating a new pending one. This suppresses spurious approval prompts when an earlier grant is still valid.
 
 Reuse response shape:
 ```json
@@ -463,21 +462,22 @@ Response:
 {
   "hosts": {
     "web-prod-1": {
+      "hostnames": ["web-prod-1", "web-prod-1.example.com"],
       "principals": ["deploy"],
-      "role": "agent-ssh-deploy",
       "description": "Production web server"
     }
   },
   "hostGroups": {
     "production": {
       "tag": "production",
-      "role": "agent-ssh-deploy",
       "description": "All production servers",
       "min_level": 2
     }
   }
 }
 ```
+
+(The underlying Vault SSH role used when signing is a gateway-wide config value, not a per-host field — it is not returned here.)
 
 #### Grant-Gated Endpoint
 
@@ -519,7 +519,6 @@ Request body (scope mode):
 | `hostGroup` | string | mode 2, L2 | Host group name |
 | `principal` | string | mode 2 | SSH username for the certificate |
 | `description` | string | mode 2 | Human-readable reason (shown to approver if approval is needed) |
-| `role` | string | no | Vault SSH role override |
 | `durationMinutes` | int | no | Requested duration |
 | `allowReplaceShorterGrant` | bool | no | If true in mode 2, bypass dedupe against a shorter active grant and force a new approval |
 | `callbackSessionKey` | string | no | Echoed back in callback payload if a new grant is created |
@@ -530,6 +529,8 @@ Response (cert issued — mode 1, or mode 2 with reuse):
   "signedKey": "ssh-ed25519-cert-v01@openssh.com AAAAC3...",
   "serial": "abc123456",
   "validBefore": "2026-03-23T19:42:01.964774+00:00",
+  "ttlSeconds": 300,
+  "grantExpiresAt": "2026-03-23T19:45:00.000000+00:00",
   "grantId": "g_11155f2e244bc44e",
   "certificateIssued": true,
   "action": "reused_active_grant",
@@ -538,6 +539,8 @@ Response (cert issued — mode 1, or mode 2 with reuse):
   "shorterThanRequested": false
 }
 ```
+
+The issued cert's TTL is capped by the minimum of: the configured `max_ttl_minutes`, the grant's original approved duration, and the grant's actual remaining lifetime. `validBefore` reflects the real cert expiry — it may be earlier than `grantExpiresAt` (when `max_ttl_minutes` caps the cert, or when the issuance call is near the grant boundary). If the grant has less than ~5 seconds remaining, the endpoint refuses with HTTP 400 rather than issue a useless cert.
 
 (In mode 1, the `action` / `reused` / `durationSatisfied` / `shorterThanRequested` fields are omitted — the caller already chose the grant.)
 
@@ -668,10 +671,11 @@ Key fields:
 | `callback.hooks_token_vault_path` | Vault path for the hooks Bearer token (field: `hooks_token`) |
 | `providers.ssh.enabled` | Enable the SSH provider (bool) |
 | `providers.ssh.vault_ssh_mount` | Vault mount point for the SSH secrets engine (default: `"ssh"`) |
-| `providers.ssh.hosts` | Map of hostname to `{principals, role, description}` |
-| `providers.ssh.host_groups` | Map of group name to `{tag, role, description, min_level}` |
-| `providers.ssh.roles` | Map of Vault SSH role name to `{allowed_principals, default_extensions}` |
-| `providers.ssh.defaults` | Default TTLs: `level1_ttl_minutes`, `level2_ttl_minutes`, `level3_ttl_minutes` |
+| `providers.ssh.vault_ssh_role` | Vault SSH role to sign user certs against (gateway-wide; all grants sign via this role) |
+| `providers.ssh.max_ttl_minutes` | Upper cap on individual issued cert TTL (default: 30). Cert TTL is `min(max_ttl, grant_duration, grant_remaining_lifetime)`. |
+| `providers.ssh.hosts` | Map of hostname to `{hostnames, principals, description}` |
+| `providers.ssh.host_groups` | Map of group name to `{tag, description, min_level}` |
+| `providers.ssh.defaults` | Default grant durations: `level1_ttl_minutes`, `level2_ttl_minutes`, `level3_ttl_minutes` |
 
 See `config.json.example` for the full schema including rate limits, default grant durations, SSH provider configuration, and sensitive pattern configuration.
 
@@ -809,23 +813,18 @@ Add the SSH provider configuration to `config.json`:
     "ssh": {
       "enabled": true,
       "vault_ssh_mount": "ssh",
-      "roles": {
-        "agent-ssh-deploy": {
-          "allowed_principals": ["deploy", "agent"],
-          "default_extensions": {"permit-pty": ""}
-        }
-      },
+      "vault_ssh_role": "agent-ssh-deploy",
+      "max_ttl_minutes": 30,
       "hosts": {
         "web-prod-1": {
+          "hostnames": ["web-prod-1", "web-prod-1.example.com"],
           "principals": ["deploy"],
-          "role": "agent-ssh-deploy",
           "description": "Production web server"
         }
       },
       "host_groups": {
         "production": {
           "tag": "production",
-          "role": "agent-ssh-deploy",
           "description": "All production servers",
           "min_level": 2
         }
@@ -839,6 +838,8 @@ Add the SSH provider configuration to `config.json`:
   }
 }
 ```
+
+The Vault SSH role's own config (`allowed_principals`, `default_extensions`, etc.) lives in Vault, not in the gateway config. The gateway always signs via the single configured `vault_ssh_role`, scoped per-request by `valid_principals`.
 
 ### 7. Create `.env` File
 
@@ -867,6 +868,29 @@ This step is only needed if exposing the gateway over the internet. On a trusted
 - **Service**: `http://authorization-gateway:18795`
 
 Protect with a Cloudflare Access policy. Create a service token for the agent to use.
+
+## Running tests
+
+The test suite is self-contained — it points `gateway.config` at a checked-in
+fixture so a fresh clone does not need a hand-written `config.json`.
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt pytest
+pytest tests/
+```
+
+Tests use `tests/fixtures/test_config.json` by default. If you want to run
+against a different config, set `GATEWAY_CONFIG` (absolute or repo-relative
+path) before invoking pytest:
+
+```bash
+GATEWAY_CONFIG=./my-config.json pytest tests/
+```
+
+The fixtures use an in-memory fake for Vault SSH signing, so no Vault server is
+required. No network access is needed to run the suite.
 
 ## Architecture
 

@@ -90,20 +90,16 @@ def get_active_grant(grant_id: str) -> Optional[dict]:
 
 
 def _ssh_scope_matches(grant_params: dict, level: int, host: Optional[str],
-                       host_group: Optional[str], principal: Optional[str],
-                       role: Optional[str]) -> bool:
+                       host_group: Optional[str], principal: Optional[str]) -> bool:
     """Decide whether an existing SSH grant's scope covers a new request.
 
     Uses narrow equivalence: same level, same host (L1), same host_group (L2),
-    same principal, and same role (if the caller explicitly asked for one).
-    This preserves security semantics — never broaden access by matching loosely.
+    same principal. Preserves security semantics — never broaden access.
+
+    (The Vault SSH role used for signing is a gateway-wide config value, not a
+    per-grant attribute, so it is not part of the match.)
     """
     if grant_params.get("principal") != principal:
-        return False
-    # If the caller explicitly specified a role, require equality.
-    # If the caller didn't specify a role, any role on the existing grant is
-    # acceptable (defaults to the host/group config on the existing grant).
-    if role is not None and grant_params.get("role") != role:
         return False
     if level == 1:
         return grant_params.get("host") == host and not grant_params.get("hostGroup")
@@ -133,7 +129,6 @@ def find_active_ssh_grant(
     host: Optional[str] = None,
     host_group: Optional[str] = None,
     principal: Optional[str] = None,
-    role: Optional[str] = None,
     requestor: Optional[str] = None,
     requested_duration_minutes: Optional[int] = None,
 ) -> Optional[dict]:
@@ -149,8 +144,8 @@ def find_active_ssh_grant(
       }
     or None if no matching active SSH grant exists.
 
-    Matches narrowly on (level, host/host_group, principal, role, requestor)
-    to avoid broadening access.
+    Matches narrowly on (level, host/host_group, principal, requestor) to
+    avoid broadening access.
     """
     now = datetime.now(timezone.utc)
     now_iso = now.isoformat()
@@ -177,7 +172,7 @@ def find_active_ssh_grant(
             g_params = json.loads(g.get("resource_params") or "{}")
         except json.JSONDecodeError:
             continue
-        if not _ssh_scope_matches(g_params, level, host, host_group, principal, role):
+        if not _ssh_scope_matches(g_params, level, host, host_group, principal):
             continue
         remaining = _remaining_seconds(g, now)
         if remaining > best_remaining:

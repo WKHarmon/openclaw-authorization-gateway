@@ -153,22 +153,21 @@ All levels can request durations up to 24 hours (1440 minutes).
 ## SSH Level 0 -- Always Available (No Grant Needed)
 
 ### `GET /api/ssh/hosts`
-List all configured SSH hosts and host groups. Returns available principals, roles, and descriptions. Use this to discover what hosts you can request access to.
+List all configured SSH hosts and host groups. Returns available hostnames, principals, and descriptions. Use this to discover what hosts you can request access to.
 
 Response:
 ```json
 {
   "hosts": {
     "web-prod-1": {
+      "hostnames": ["web-prod-1", "web-prod-1.example.com"],
       "principals": ["deploy"],
-      "role": "agent-ssh-deploy",
       "description": "Production web server"
     }
   },
   "hostGroups": {
     "production": {
       "tag": "production",
-      "role": "agent-ssh-deploy",
       "description": "All production servers",
       "min_level": 2
     }
@@ -202,9 +201,13 @@ If an active matching grant exists: cert is minted in the same response.
   "grantId": "g_...",
   "signedKey": "ssh-ed25519-cert-v01@openssh.com AAAA...",
   "serial": "1234567890",
-  "validBefore": "2026-03-26T12:30:00+00:00"
+  "validBefore": "2026-03-26T12:30:00+00:00",
+  "ttlSeconds": 300,
+  "grantExpiresAt": "2026-03-26T12:35:00+00:00"
 }
 ```
+
+The cert TTL is capped by `min(max_ttl_minutes, grant duration, grant remaining lifetime)`. `validBefore` is the actual cert expiry — it can be sooner than `grantExpiresAt`. If a grant has almost no remaining lifetime, the endpoint returns HTTP 400 rather than issue a useless cert.
 
 If no active matching grant: new approval is requested and no cert is issued yet. After the approval callback fires, re-send the same request and it will dedupe onto the now-active grant.
 ```json
@@ -278,12 +281,11 @@ When you need elevated access (reading email bodies, signing SSH certs), request
 | `host` | Level 1 only | Target host name (must match a configured host) |
 | `principal` | Level 1 optional, Level 3 required | SSH principal (username) for the certificate |
 | `hostGroup` | Level 2 only | Host group name (must match a configured group) |
-| `role` | no | Vault SSH role to use (defaults to the host/group's configured role) |
 | `allowReplaceShorterGrant` | no | Default false. When true, bypass dedupe against a matching active grant whose remaining duration is shorter than requested, and force a fresh approval flow. Use this only when you actually need a longer grant than the one already active. |
 
 ### SSH grant dedupe / reuse
 
-The gateway deduplicates SSH grant requests. If you POST `/api/grants/request` for an SSH scope (level + host/hostGroup + principal + role) that already has an active matching grant for your requestor, the response is NOT a new pending approval — it echoes the existing grant:
+The gateway deduplicates SSH grant requests. If you POST `/api/grants/request` for an SSH scope (level + host/hostGroup + principal) that already has an active matching grant for your requestor, the response is NOT a new pending approval — it echoes the existing grant:
 
 ```json
 {
@@ -419,7 +421,7 @@ curl -s -X POST "$BASE/api/grants/request" \
 ```bash
 # List all configured hosts and host groups
 curl -s "$BASE/api/ssh/hosts" ...
-# Returns hosts with their principals, roles, and descriptions
+# Returns hosts with their hostnames, principals, and descriptions
 ```
 
 ## SSH: Get a certificate for a specific host (one call)

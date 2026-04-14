@@ -1,0 +1,53 @@
+{
+  "port": 18795,
+  "agent_name": "TestAgent",
+  "approver_name": "TestApprover",
+  "approval_url_base": "https://test.local",
+  "signal": {
+    "api_url": "http://signal-api.invalid:8080",
+    "sender": "+10000000000",
+    "approver": "+10000000001",
+    "webhook_token": ""
+  },
+  "rate_limit": {
+    "grant_requests_per_minute": 5
+  },
+  "defaults": {
+    "level1_expiry_minutes": 5,
+    "level2_default_duration_minutes": 30,
+    "level3_default_duration_minutes": 15
+  },
+  "sensitive_patterns_file": "sensitive_patterns.json",
+  "providers": {
+    "ssh": {
+      "enabled": true,
+      "vault_ssh_mount": "ssh",
+      "vault_ssh_role": "test-role",
+      "max_ttl_minutes": 30,
+      "hosts": {
+        "server": {
+          "hostnames": ["server"],
+          "principals": ["kyle", "root"],
+          "description": "Test server"
+        },
+        "aiserver": {
+          "hostnames": ["aiserver"],
+          "principals": ["kyle"],
+          "description": "Test AI server"
+        }
+      },
+      "host_groups": {
+        "production": {
+          "tag": "production",
+          "description": "Test production group",
+          "min_level": 2
+        }
+      },
+      "defaults": {
+        "level1_ttl_minutes": 30,
+        "level2_ttl_minutes": 30,
+        "level3_ttl_minutes": 30
+      }
+    }
+  }
+}

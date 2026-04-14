@@ -21,7 +21,7 @@ def test_scope_mode_reuses_active_grant_and_mints_cert(gateway_env):
         host="server",
         principal="kyle",
         remaining_minutes=20,
-        requestor="Lisa",
+        requestor="TestAgent",
     )
     resp = gateway_env["client"].post(
         "/api/ssh/credentials",
@@ -89,7 +89,7 @@ def test_scope_mode_shorter_grant_is_reused_with_shortfall_flags(gateway_env):
         host="server",
         principal="kyle",
         remaining_minutes=2,
-        requestor="Lisa",
+        requestor="TestAgent",
     )
     resp = gateway_env["client"].post(
         "/api/ssh/credentials",
@@ -123,7 +123,7 @@ def test_scope_mode_explicit_replacement_returns_pending(gateway_env):
         host="server",
         principal="kyle",
         remaining_minutes=1,
-        requestor="Lisa",
+        requestor="TestAgent",
     )
     resp = gateway_env["client"].post(
         "/api/ssh/credentials",
@@ -157,7 +157,7 @@ def test_classic_grant_id_mode_still_works(gateway_env):
         host="server",
         principal="kyle",
         remaining_minutes=15,
-        requestor="Lisa",
+        requestor="TestAgent",
     )
     resp = gateway_env["client"].post(
         "/api/ssh/credentials",
@@ -222,7 +222,7 @@ def test_reuse_does_not_consume_rate_limit(gateway_env):
         host="server",
         principal="kyle",
         remaining_minutes=30,
-        requestor="Lisa",
+        requestor="TestAgent",
     )
     # 10 rapid reuses — all should succeed with cert minted.
     for _ in range(10):

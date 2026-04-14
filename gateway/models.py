@@ -23,7 +23,6 @@ class GrantRequest(BaseModel):
     host: Optional[str] = None
     principal: Optional[str] = None
     hostGroup: Optional[str] = None
-    role: Optional[str] = None
     publicKey: Optional[str] = None
 
     # SSH-specific: explicit opt-in to bypass active-grant dedupe and request a
@@ -59,7 +58,6 @@ class SSHCredentialRequest(BaseModel):
     host: Optional[str] = None
     hostGroup: Optional[str] = None
     principal: Optional[str] = None
-    role: Optional[str] = None
     description: Optional[str] = None
     durationMinutes: Optional[int] = None
     allowReplaceShorterGrant: bool = False

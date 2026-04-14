@@ -2,6 +2,7 @@
 
 import json
 import logging
+from datetime import datetime, timedelta, timezone
 from html import escape
 from typing import Optional
 
@@ -15,6 +16,11 @@ from gateway.models import GrantRequest, SSHCredentialRequest
 from gateway.vault import vault
 
 log = logging.getLogger("gateway.providers.ssh")
+
+# A cert whose TTL is below this floor is effectively useless (by the time the
+# caller actually uses it, it may already be expired). Refuse in that case so
+# the caller gets a clear error instead of a broken cert.
+_MIN_CERT_TTL_SECONDS = 5
 
 
 def _ssh_config() -> dict:
@@ -224,7 +230,6 @@ def _register_ssh_routes(app: FastAPI):
                 host=req.host,
                 hostGroup=req.hostGroup,
                 principal=req.principal,
-                role=req.role,
                 allowReplaceShorterGrant=req.allowReplaceShorterGrant,
             )
             create_resp = await create_or_reuse_grant(gr, requestor_name)
@@ -262,10 +267,36 @@ def _register_ssh_routes(app: FastAPI):
         if not principal:
             raise HTTPException(400, "Could not determine principal for this grant")
 
-        # Cap TTL to the configured max
-        max_ttl = cfg.get("max_ttl_minutes", 30)
-        cert_ttl = min(grant["duration_minutes"], max_ttl)
-        ttl = f"{cert_ttl}m"
+        # ── TTL capping: the cert must never outlive the grant ─────────
+        # Cap by ALL of:
+        #   1. configured gateway max TTL
+        #   2. grant's original approved duration
+        #   3. actual remaining lifetime until grant.expires_at
+        now = datetime.now(timezone.utc)
+        try:
+            expires_at = datetime.fromisoformat(grant["expires_at"])
+        except (TypeError, ValueError):
+            raise HTTPException(500, "Grant has invalid expires_at")
+
+        remaining_seconds = int((expires_at - now).total_seconds())
+        if remaining_seconds < _MIN_CERT_TTL_SECONDS:
+            # Grant is about to expire (or expired between get_active_grant and
+            # this check). Refuse cleanly.
+            raise HTTPException(
+                400,
+                f"Grant has insufficient remaining lifetime "
+                f"({remaining_seconds}s) to issue a useful certificate",
+            )
+
+        max_ttl_seconds = int(cfg.get("max_ttl_minutes", 30)) * 60
+        grant_duration_seconds = int(grant["duration_minutes"]) * 60
+        cert_ttl_seconds = min(
+            remaining_seconds,
+            grant_duration_seconds,
+            max_ttl_seconds,
+        )
+        ttl = f"{cert_ttl_seconds}s"
+        cert_expires_at = now + timedelta(seconds=cert_ttl_seconds)
 
         try:
             result = await vault.sign_ssh_key(
@@ -287,6 +318,8 @@ def _register_ssh_routes(app: FastAPI):
             "role": role,
             "serial": result.get("serial_number", ""),
             "scopeMode": reuse_meta is not None,
+            "certTtlSeconds": cert_ttl_seconds,
+            "grantRemainingSeconds": remaining_seconds,
         })
 
         # SSH grants are NOT consumed after a single use because certificates
@@ -296,7 +329,13 @@ def _register_ssh_routes(app: FastAPI):
         response: dict = {
             "signedKey": result["signed_key"],
             "serial": result.get("serial_number", ""),
-            "validBefore": grant["expires_at"],
+            # validBefore reflects what was ACTUALLY signed (can be sooner
+            # than grant.expires_at when max_ttl caps the cert, or when the
+            # grant's remaining lifetime is long but we deliberately issued
+            # a shorter cert).
+            "validBefore": cert_expires_at.isoformat(),
+            "ttlSeconds": cert_ttl_seconds,
+            "grantExpiresAt": grant["expires_at"],
             "grantId": grant["id"],
             "certificateIssued": True,
         }

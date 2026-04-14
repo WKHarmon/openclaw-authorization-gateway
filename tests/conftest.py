@@ -4,17 +4,20 @@ These tests exercise the gateway's grant-request route + the
 ``find_active_ssh_grant`` helper without bringing up any external systems
 (Signal, Vault, Gmail API). We:
 
+  * point the gateway at a checked-in test config via ``GATEWAY_CONFIG``,
+    so running tests in a fresh clone does not require a local config.json
   * redirect ``GRANTS_DB_PATH`` at a temp file for each test
   * monkey-patch ``send_signal_message`` to a no-op
   * inject a minimal SSH provider into the provider registry so the grant
     route can accept ``resourceType=ssh`` requests
-  * build a tiny FastAPI app that only mounts the grants route
+  * build a tiny FastAPI app that only mounts the grants + SSH routes
 """
 
 from __future__ import annotations
 
-import importlib
+import copy
 import json
+import os
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -28,6 +31,12 @@ from fastapi.testclient import TestClient
 REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
+
+# Point gateway.config at the checked-in fixture *before* ``gateway.config``
+# is imported (directly or transitively), so CONFIG is populated without
+# needing a hand-created config.json in the repo root.
+FIXTURE_CONFIG = Path(__file__).resolve().parent / "fixtures" / "test_config.json"
+os.environ.setdefault("GATEWAY_CONFIG", str(FIXTURE_CONFIG))
 
 
 # ── Minimal in-memory SSH provider for tests ────────────────────────────────
@@ -108,7 +117,11 @@ def gateway_env(tmp_path, monkeypatch):
     # Reset the rate-limit deque between tests
     grants_routes._grant_request_times.clear()
 
-    # Ensure CONFIG has the SSH provider enabled + a valid approval_url_base
+    # Snapshot CONFIG so per-test mutations don't leak into other tests.
+    _config_snapshot = copy.deepcopy(config_mod.CONFIG)
+
+    # The test fixture config already provides approval_url_base + SSH provider,
+    # but defend against an unusual import order:
     config_mod.CONFIG.setdefault("approval_url_base", "https://test.local")
     config_mod.CONFIG.setdefault(
         "providers", {}
@@ -142,6 +155,8 @@ def gateway_env(tmp_path, monkeypatch):
     from gateway.providers import ssh as ssh_module
 
     async def _fake_sign_ssh_key(*, mount, role, public_key, valid_principals, ttl):
+        # The real route now passes ttl in seconds, e.g. "300s". Record it
+        # verbatim so tests can inspect what was actually requested.
         return {
             "signed_key": f"FAKE-CERT-{valid_principals}-ttl{ttl}",
             "serial_number": "FAKESERIAL",
@@ -158,8 +173,8 @@ def gateway_env(tmp_path, monkeypatch):
         host: str | None = None,
         host_group: str | None = None,
         principal: str,
-        role: str | None = None,
         remaining_minutes: int = 20,
+        duration_minutes: int | None = None,
         requestor: str = "TestAgent",
     ):
         params: dict = {"principal": principal}
@@ -167,8 +182,11 @@ def gateway_env(tmp_path, monkeypatch):
             params["host"] = host
         if host_group:
             params["hostGroup"] = host_group
-        if role:
-            params["role"] = role
+        # duration_minutes is the grant's originally-approved duration. Tests
+        # that want to simulate a grant with short remaining lifetime (but a
+        # longer original duration) can set both independently.
+        if duration_minutes is None:
+            duration_minutes = remaining_minutes
         now = datetime.now(timezone.utc)
         expires_at = now + timedelta(minutes=remaining_minutes)
         conn = db_mod.db_conn()
@@ -186,7 +204,7 @@ def gateway_env(tmp_path, monkeypatch):
                     now.isoformat(),
                     now.isoformat(),
                     expires_at.isoformat(),
-                    remaining_minutes,
+                    duration_minutes,
                     json.dumps(params),
                     requestor,
                 ),
@@ -208,6 +226,9 @@ def gateway_env(tmp_path, monkeypatch):
         # Restore provider registry
         _providers.clear()
         _providers.update(prior)
+        # Restore CONFIG to avoid inter-test leakage
+        config_mod.CONFIG.clear()
+        config_mod.CONFIG.update(_config_snapshot)
 
 
 # Requestor headers: bypass the api-key middleware (which isn't mounted on

@@ -1,4 +1,14 @@
-"""Configuration loading and constants."""
+"""Configuration loading and constants.
+
+Config file resolution order (first match wins):
+  1. ``GATEWAY_CONFIG`` env var (absolute or relative path)
+  2. ``<repo root>/config.json``
+
+If neither exists the module still imports with an empty ``CONFIG`` dict — this
+is deliberate so tests / tooling can import gateway modules without a real
+production config on disk. Production deployments should always provide one of
+the above.
+"""
 
 import json
 import logging
@@ -8,7 +18,7 @@ from pathlib import Path
 log = logging.getLogger("gateway")
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-CONFIG_PATH = BASE_DIR / "config.json"
+DEFAULT_CONFIG_PATH = BASE_DIR / "config.json"
 DATA_DIR = BASE_DIR / "data"
 AUDIT_LOG_PATH = DATA_DIR / "audit.jsonl"
 GRANTS_DB_PATH = DATA_DIR / "grants.db"
@@ -21,9 +31,41 @@ VAULT_ENABLED = bool(VAULT_ROLE_ID and VAULT_SECRET_ID)
 MAX_GRANT_DURATION_MINUTES = 1440  # 24 hours
 
 
+def _resolve_config_path() -> Path | None:
+    """Return the Path to load config from, or None if nothing is available."""
+    override = os.environ.get("GATEWAY_CONFIG", "").strip()
+    if override:
+        p = Path(override).expanduser()
+        if not p.is_absolute():
+            p = (BASE_DIR / p).resolve()
+        return p
+    if DEFAULT_CONFIG_PATH.exists():
+        return DEFAULT_CONFIG_PATH
+    return None
+
+
+# Exposed for backward compat — tests that set it directly still work, but
+# prefer the ``GATEWAY_CONFIG`` env var for new code.
+CONFIG_PATH = _resolve_config_path() or DEFAULT_CONFIG_PATH
+
+
 def load_config() -> dict:
-    with open(CONFIG_PATH) as f:
-        return json.load(f)
+    """Load the resolved config file. Returns ``{}`` when no config file is
+    available (e.g. in a fresh checkout used only for tests)."""
+    path = _resolve_config_path()
+    if path is None:
+        log.warning(
+            "No config.json found at %s and GATEWAY_CONFIG is unset — "
+            "loading with empty config.",
+            DEFAULT_CONFIG_PATH,
+        )
+        return {}
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except FileNotFoundError:
+        log.warning("Config file %s not found — loading with empty config.", path)
+        return {}
 
 
 def load_sensitive_patterns(config: dict) -> dict:
