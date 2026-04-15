@@ -209,7 +209,7 @@ If an active matching grant exists: cert is minted in the same response.
 
 The cert TTL is capped by `min(max_ttl_minutes, grant duration, grant remaining lifetime)`. `validBefore` is the actual cert expiry — it can be sooner than `grantExpiresAt`. If a grant has almost no remaining lifetime, the endpoint returns HTTP 400 rather than issue a useless cert.
 
-If no active matching grant: new approval is requested and no cert is issued yet. After the approval callback fires, re-send the same request and it will dedupe onto the now-active grant.
+If no active matching grant: new approval is requested and no cert is issued yet. After the approval callback fires, re-send the same request and it will dedupe onto the now-active grant. If the approval is still pending and you accidentally send the same request again, the gateway returns the existing pending `grantId` with `"action": "reused_pending_grant_request"` instead of creating another approval prompt.
 ```json
 {
   "certificateIssued": false,
@@ -484,6 +484,7 @@ curl -s -X POST "$BASE/api/grants/request" \
 - **Request the minimum level needed.** Level 1 for a single host, Level 2 for a host group, Level 3 only when broad principal access is truly necessary.
 - **Do not manually orchestrate "list grants → pick one → mint cert".** The gateway dedupes automatically. Just `POST /api/grants/request` (or call `ssh_ensure_credentials` via MCP) — if a matching active grant exists the response will come back with `"action": "reused_active_grant"` and the same `grantId`, and you can mint a fresh cert against it. No approval prompt is sent.
 - **Shorter-than-requested active grants are reused by default.** The response sets `shorterThanRequested: true` / `durationSatisfied: false`. Only if you genuinely need longer access should you re-send the request with `"allowReplaceShorterGrant": true` to force a fresh, longer approval.
+- **Do not resubmit the same pending SSH request just to check status.** Poll `GET /api/grants/:id` (or use the callback payload's `grantId`) while it is pending. The gateway now dedupes matching pending SSH requests and returns `"action": "reused_pending_grant_request"`, but you should still treat status checks as reads, not new approval requests.
 - **SSH certs auto-expire, but grants may outlive them.** Mint a fresh cert from the same active grant when needed; never request a new approval just because the short-lived cert expired.
 - **Generate a fresh keypair for each session.** Use ephemeral SSH keys rather than long-lived ones for better security hygiene.
 

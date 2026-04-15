@@ -19,7 +19,7 @@ from fastapi import FastAPI, HTTPException, Query, Request
 from gateway.audit import audit
 from gateway.config import CONFIG, MAX_GRANT_DURATION_MINUTES
 from gateway.db import db_conn
-from gateway.grants import find_active_ssh_grant, sanitize_grant
+from gateway.grants import find_active_ssh_grant, find_pending_ssh_grant, sanitize_grant
 from gateway.models import GrantRequest
 from gateway.providers import get_provider
 from gateway.signal import send_signal_message
@@ -131,6 +131,57 @@ async def create_or_reuse_grant(
                 # with a fresh approval request, but record the linkage so
                 # the response/audit trail explain why.
                 previous_grant_id = existing["id"]
+
+        pending_match = find_pending_ssh_grant(
+            level=req.level,
+            host=req.host,
+            host_group=req.hostGroup,
+            principal=req.principal,
+            requestor=requestor_name,
+            requested_duration_minutes=duration,
+        )
+        if pending_match is not None:
+            existing = pending_match["grant"]
+            if not (
+                req.allowReplaceShorterGrant
+                and pending_match["shorter_than_requested"]
+            ):
+                audit({
+                    "action": "grant_request_pending_deduped",
+                    "grantId": existing["id"],
+                    "resourceType": "ssh",
+                    "level": req.level,
+                    "requestor": requestor_name,
+                    "durationSatisfied": pending_match["duration_satisfied"],
+                    "requestedSeconds": pending_match["requested_seconds"],
+                })
+                resp = {
+                    "grantId": existing["id"],
+                    "status": existing["status"],
+                    "level": existing["level"],
+                    "resourceType": "ssh",
+                    "durationMinutes": existing["duration_minutes"],
+                    "action": "reused_pending_grant_request",
+                    "reused": True,
+                    "durationSatisfied": pending_match["duration_satisfied"],
+                    "shorterThanRequested": pending_match["shorter_than_requested"],
+                    "requestedDurationSeconds": pending_match["requested_seconds"],
+                }
+                if pending_match["shorter_than_requested"]:
+                    resp["message"] = (
+                        "Matching SSH grant request is already pending, but its "
+                        "requested duration is shorter than requested here. Set "
+                        "allowReplaceShorterGrant=true to create a new longer "
+                        "approval request."
+                    )
+                else:
+                    resp["message"] = (
+                        "Matching SSH grant request is already pending. Poll "
+                        f"GET /api/grants/{existing['id']} for status instead of "
+                        "creating another approval request."
+                    )
+                return resp
+            previous_grant_id = existing["id"]
 
     # ── About to actually create a new grant — apply the rate limit now ─
     _apply_rate_limit()

@@ -94,6 +94,8 @@ Reuse response shape:
 
 If the active grant's remaining duration is shorter than requested, it is still reused but the response reports `"durationSatisfied": false` and `"shorterThanRequested": true`. To force a fresh, longer approval, resend the same request with `"allowReplaceShorterGrant": true`; the response then includes `"action": "requested_replacement_grant_due_to_short_duration"` and `"previousGrantId"`.
 
+If a matching SSH grant request is already **pending**, the gateway now reuses that pending request too, returning `"action": "reused_pending_grant_request"` with the existing `grantId` instead of sending another approval prompt. Poll `GET /api/grants/:id` (or wait for the callback) rather than submitting the same request again just to check status.
+
 New-request response shape also gains `"action"` (`"requested_new_grant"` or `"requested_replacement_grant_due_to_short_duration"`) and `"reused": false`.
 
 Response:
@@ -559,7 +561,7 @@ Response (mode 2, no active grant → pending approval):
 }
 ```
 
-After the approval callback fires, the caller can retry the same `POST /api/ssh/credentials` request (scope mode) — this time it will dedupe onto the newly-active grant and mint a cert.
+After the approval callback fires, the caller can retry the same `POST /api/ssh/credentials` request (scope mode) — this time it will dedupe onto the newly-active grant and mint a cert. While the request is still pending, though, repeated identical scope-mode calls will now return the same pending `grantId` with `"action": "reused_pending_grant_request"` rather than creating duplicate approvals.
 
 The agent writes `signedKey` to a `-cert.pub` file alongside its private key, then connects normally:
 

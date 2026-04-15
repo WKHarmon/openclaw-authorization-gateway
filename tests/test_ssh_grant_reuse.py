@@ -175,6 +175,42 @@ def test_no_match_creates_new_pending_grant(gateway_env):
     assert "previousGrantId" not in body
 
 
+def test_matching_pending_request_is_reused(gateway_env):
+    gateway_env["insert_pending_ssh_grant"](
+        grant_id="g_pending_existing",
+        level=1,
+        host="server",
+        principal="kyle",
+        duration_minutes=30,
+        requestor="TestAgent",
+    )
+    resp = gateway_env["client"].post(
+        "/api/grants/request",
+        headers=HEADERS,
+        json={
+            "resourceType": "ssh",
+            "level": 1,
+            "host": "server",
+            "principal": "kyle",
+            "description": "status check shouldn't duplicate",
+            "durationMinutes": 30,
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["action"] == "reused_pending_grant_request"
+    assert body["reused"] is True
+    assert body["status"] == "pending"
+    assert body["grantId"] == "g_pending_existing"
+
+    conn = gateway_env["db_conn"]()
+    try:
+        count = conn.execute("SELECT COUNT(*) FROM grants").fetchone()[0]
+    finally:
+        conn.close()
+    assert count == 1
+
+
 # ── Test 5: non-matching active grants are NOT reused ──────────────────────
 
 

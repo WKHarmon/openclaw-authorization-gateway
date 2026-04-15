@@ -197,3 +197,76 @@ def find_active_ssh_grant(
         "duration_satisfied": satisfied,
         "shorter_than_requested": not satisfied,
     }
+
+
+def find_pending_ssh_grant(
+    *,
+    level: int,
+    host: Optional[str] = None,
+    host_group: Optional[str] = None,
+    principal: Optional[str] = None,
+    requestor: Optional[str] = None,
+    requested_duration_minutes: Optional[int] = None,
+) -> Optional[dict]:
+    """Find an existing pending SSH grant request for the same scope.
+
+    This prevents duplicate approval prompts when a caller re-sends the same
+    request while the first one is still waiting on human approval.
+
+    Returns a dict:
+      {
+        "grant": <full grant row>,
+        "requested_seconds": int | None,
+        "duration_satisfied": bool,
+        "shorter_than_requested": bool,
+      }
+    or None if no matching pending SSH grant exists.
+    """
+    conn = db_conn()
+    try:
+        query = (
+            "SELECT * FROM grants WHERE status='pending' AND resource_type='ssh' "
+            "AND level=?"
+        )
+        params: list = [level]
+        if requestor is not None:
+            query += " AND requestor=?"
+            params.append(requestor)
+        query += " ORDER BY created_at DESC"
+        rows = conn.execute(query, tuple(params)).fetchall()
+    finally:
+        conn.close()
+
+    best = None
+    best_duration = -1
+    for r in rows:
+        g = dict(r)
+        try:
+            g_params = json.loads(g.get("resource_params") or "{}")
+        except json.JSONDecodeError:
+            continue
+        if not _ssh_scope_matches(g_params, level, host, host_group, principal):
+            continue
+        grant_duration = int(g.get("duration_minutes") or 0)
+        if grant_duration > best_duration:
+            best = g
+            best_duration = grant_duration
+
+    if best is None:
+        return None
+
+    requested_seconds = (
+        requested_duration_minutes * 60
+        if requested_duration_minutes is not None
+        else None
+    )
+    available_seconds = int(best.get("duration_minutes") or 0) * 60
+    satisfied = (
+        requested_seconds is None or available_seconds >= requested_seconds
+    )
+    return {
+        "grant": best,
+        "requested_seconds": requested_seconds,
+        "duration_satisfied": satisfied,
+        "shorter_than_requested": not satisfied,
+    }

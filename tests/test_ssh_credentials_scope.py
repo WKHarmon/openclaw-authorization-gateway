@@ -79,6 +79,43 @@ def test_scope_mode_no_match_creates_pending_no_cert(gateway_env):
     assert "signedKey" not in body
 
 
+def test_scope_mode_reuses_matching_pending_request(gateway_env):
+    gateway_env["insert_pending_ssh_grant"](
+        grant_id="g_pending_scope",
+        level=1,
+        host="server",
+        principal="kyle",
+        duration_minutes=30,
+        requestor="TestAgent",
+    )
+    resp = gateway_env["client"].post(
+        "/api/ssh/credentials",
+        headers=HEADERS,
+        json={
+            "publicKey": "ssh-ed25519 AAAAfake",
+            "level": 1,
+            "host": "server",
+            "principal": "kyle",
+            "description": "check pending status without duping",
+            "durationMinutes": 30,
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["certificateIssued"] is False
+    assert body["action"] == "reused_pending_grant_request"
+    assert body["status"] == "pending"
+    assert body["reused"] is True
+    assert body["grantId"] == "g_pending_scope"
+
+    conn = gateway_env["db_conn"]()
+    try:
+        count = conn.execute("SELECT COUNT(*) FROM grants").fetchone()[0]
+    finally:
+        conn.close()
+    assert count == 1
+
+
 # ── Scope mode + shorter existing grant → cert minted, shortfall reported ─
 
 

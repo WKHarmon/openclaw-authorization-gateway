@@ -214,11 +214,51 @@ def gateway_env(tmp_path, monkeypatch):
             conn.close()
         return {"id": grant_id, "expires_at": expires_at.isoformat()}
 
+    def insert_pending_ssh_grant(
+        *,
+        grant_id: str,
+        level: int,
+        host: str | None = None,
+        host_group: str | None = None,
+        principal: str,
+        duration_minutes: int = 20,
+        requestor: str = "TestAgent",
+    ):
+        params: dict = {"principal": principal}
+        if host:
+            params["host"] = host
+        if host_group:
+            params["hostGroup"] = host_group
+        now = datetime.now(timezone.utc)
+        conn = db_mod.db_conn()
+        try:
+            conn.execute(
+                "INSERT INTO grants (id, level, status, description, approval_token, "
+                "signal_code, created_at, duration_minutes, metadata, resource_type, "
+                "resource_params, requestor) "
+                "VALUES (?, ?, 'pending', 'test', ?, ?, ?, ?, '{}', 'ssh', ?, ?)",
+                (
+                    grant_id,
+                    level,
+                    f"tok_{grant_id}",
+                    "AB12CD",
+                    now.isoformat(),
+                    duration_minutes,
+                    json.dumps(params),
+                    requestor,
+                ),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+        return {"id": grant_id}
+
     try:
         yield {
             "app": app,
             "client": client,
             "insert_active_ssh_grant": insert_active_ssh_grant,
+            "insert_pending_ssh_grant": insert_pending_ssh_grant,
             "config": config_mod.CONFIG,
             "db_conn": db_mod.db_conn,
         }
